@@ -5,6 +5,7 @@ use oauth2::{
     AccessToken, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl,
     RefreshToken, Scope, TokenResponse, TokenUrl,
 };
+use std::collections::HashMap;
 use std::env;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
@@ -14,16 +15,28 @@ pub struct Intuit {
     pub state: String,
     pub access_token: AccessToken,
     pub refresh_token: RefreshToken,
-    pub realmId: String,
+    pub realm_id: String,
 }
 
 impl Intuit {
+    pub async fn get(&self) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
+        let rsp = reqwest::get(format!(
+            "quickbooks.api.intuit.com/v3/company/{}/account",
+            self.realm_id
+        ))
+        .await?
+        .json::<HashMap<String, String>>()
+        .await?;
+
+        Ok(rsp)
+    }
+
     pub fn build() -> Intuit {
         let mut result = Intuit {
             access_token: AccessToken::new(String::from("")),
             refresh_token: RefreshToken::new(String::from("")),
             state: String::from(""),
-            realmId: String::from(""),
+            realm_id: String::from(""),
         };
 
         dotenv().ok();
@@ -64,7 +77,7 @@ impl Intuit {
             if let Ok(mut stream) = stream {
                 let code;
                 let state;
-                let realmId: String;
+                let _realm_id: String;
                 {
                     let mut reader = BufReader::new(&stream);
 
@@ -96,7 +109,7 @@ impl Intuit {
                     let (_, value) = code_pair;
                     code = AuthorizationCode::new(value.into_owned());
                     let (_, value2) = pair2;
-                    result.realmId = value2.into_owned();
+                    result.realm_id = value2.into_owned();
 
                     let state_pair = url
                         .query_pairs()
